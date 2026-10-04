@@ -10,7 +10,7 @@ local UIS = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
-local VERSION = "V0.4"
+local VERSION = "V0.5"
 local DEVELOPER = "FARIH"
 local DISCORD = "Ellll0590"
 local WHATSAPP = "Saluran Comming"
@@ -390,7 +390,7 @@ local function showToast(text)
 end
 
 -- Window
-local WIN_W, WIN_H = 300, 360
+local WIN_W, WIN_H = 320, 380
 
 local window = Instance.new("Frame")
 window.Size = UDim2.fromOffset(WIN_W, WIN_H)
@@ -510,10 +510,10 @@ end)
 
 local function addTab(name)
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1 / 5, -3, 1, 0)
+	btn.Size = UDim2.new(1 / 6, -3, 1, 0)
 	btn.TextColor3 = Color3.new(1, 1, 1)
 	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 10
+	btn.TextSize = 9
 	btn.Text = name
 	btn.Parent = tabBar
 	corner(btn, 5)
@@ -631,6 +631,11 @@ end
 
 local function applyTheme(name)
 	theme = themes[name]
+	pcall(function()
+		if writefile then
+			writefile("FarihHub_theme.txt", name)
+		end
+	end)
 	for _, r in ipairs(registry) do
 		if r[1].Parent then
 			r[1][r[2]] = theme[r[3]]
@@ -646,6 +651,12 @@ local optPage = addTab("Optimasi")
 addSection(optPage, "Statistik")
 local pingRow = addRow(optPage, "Ping: -")
 local memRow = addRow(optPage, "Memori: -")
+local fpsStats = { min = math.huge, max = 0, sum = 0, n = 0 }
+local fpsStatRow = addRow(optPage, "FPS min/rata/max: -")
+addButton(optPage, "Reset statistik FPS", function()
+	fpsStats.min, fpsStats.max, fpsStats.sum, fpsStats.n = math.huge, 0, 0, 0
+	fpsStatRow.Text = "FPS min/rata/max: -"
+end)
 
 local tBad, tHeavy, tHide, tMute, tFps
 
@@ -701,6 +712,11 @@ end)
 addButton(optPage, "Bersihkan Memori", function()
 	pcall(collectgarbage, "collect")
 	status.Text = "Memori dibersihkan."
+end)
+local autoClean, nextClean = false, 0
+addToggle(optPage, "Auto bersihkan (2 menit)", false, function(on)
+	autoClean = on
+	nextClean = os.clock() + 120
 end)
 
 ---------------------------------------------------------------- Tab: Profile
@@ -867,6 +883,98 @@ notesBox.FocusLost:Connect(function()
 end)
 
 
+---------------------------------------------------------------- Tab: Tools
+local toolsPage = addTab("Tools")
+
+addSection(toolsPage, "Server")
+local playersRow = addRow(toolsPage, "Pemain: -")
+local uptimeRow = addRow(toolsPage, "Server aktif: -")
+addRow(toolsPage, "Job ID: " .. string.sub(game.JobId ~= "" and game.JobId or "studio", 1, 8) .. "...")
+addButton(toolsPage, "Salin Job ID", function()
+	if setclipboard and game.JobId ~= "" then
+		pcall(setclipboard, game.JobId)
+		showToast("Job ID disalin.")
+	end
+end)
+addButton(toolsPage, "Rejoin server ini", function()
+	showToast("Mencoba masuk ulang...")
+	pcall(function()
+		game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+	end)
+end)
+
+addSection(toolsPage, "Waktu")
+local clockRow = addRow(toolsPage, "Jam: -")
+local swRow = addRow(toolsPage, "Stopwatch: 00:00:00")
+local swRunning, swElapsed, swStart = false, 0, 0
+addButton(toolsPage, "Start / Stop stopwatch", function()
+	if swRunning then
+		swElapsed += os.clock() - swStart
+		swRunning = false
+	else
+		swStart = os.clock()
+		swRunning = true
+	end
+end)
+addButton(toolsPage, "Reset stopwatch", function()
+	swRunning = false
+	swElapsed = 0
+end)
+
+addSection(toolsPage, "Tampilan")
+local startCam = workspace.CurrentCamera
+local originalFov = startCam and startCam.FieldOfView or 70
+local fovOptions = { 60, 70, 80, 90, 100, 120 }
+local fovBtn
+fovBtn = addButton(toolsPage, "FOV: " .. math.floor(originalFov + 0.5) .. " (tap ganti)", function()
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	local nextFov = fovOptions[1]
+	for _, f in ipairs(fovOptions) do
+		if f > cam.FieldOfView + 0.5 then
+			nextFov = f
+			break
+		end
+	end
+	cam.FieldOfView = nextFov
+	fovBtn.Text = "FOV: " .. nextFov .. " (tap ganti)"
+end)
+addButton(toolsPage, "Reset FOV", function()
+	local cam = workspace.CurrentCamera
+	if cam then
+		cam.FieldOfView = originalFov
+		fovBtn.Text = "FOV: " .. math.floor(originalFov + 0.5) .. " (tap ganti)"
+	end
+end)
+
+local hiddenGuis = {}
+addToggle(toolsPage, "Mode Screenshot", false, function(on)
+	if on then
+		for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+			if g:IsA("ScreenGui") and g ~= gui and g.Enabled then
+				g.Enabled = false
+				table.insert(hiddenGuis, g)
+			end
+		end
+		pcall(function()
+			game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+		end)
+		showToast("UI game disembunyikan. Matikan lagi untuk menampilkan.")
+	else
+		for _, g in ipairs(hiddenGuis) do
+			if g.Parent then
+				g.Enabled = true
+			end
+		end
+		table.clear(hiddenGuis)
+		pcall(function()
+			game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+		end)
+	end
+end)
+
 ---------------------------------------------------------------- Tab: Pemula
 local guidePage = addTab("Pemula")
 addSection(guidePage, "Panduan singkat")
@@ -910,13 +1018,32 @@ reg(credit, "TextColor3", "accent")
 
 showTab("Optimasi")
 
+-- Muat tema yang terakhir dipilih
+pcall(function()
+	if isfile and readfile and isfile("FarihHub_theme.txt") then
+		local saved = readfile("FarihHub_theme.txt")
+		if themes[saved] then
+			applyTheme(saved)
+		end
+	end
+end)
+
 ---------------------------------------------------------------- Loop update
 local frames, lastTick = 0, os.clock()
 table.insert(conns, RunService.RenderStepped:Connect(function()
 	frames += 1
 	local now = os.clock()
 	if now - lastTick >= 0.5 then
-		fpsLabel.Text = "FPS: " .. math.floor(frames / (now - lastTick) + 0.5)
+		local fps = math.floor(frames / (now - lastTick) + 0.5)
+		fpsLabel.Text = "FPS: " .. fps
+		fpsStats.min = math.min(fpsStats.min, fps)
+		fpsStats.max = math.max(fpsStats.max, fps)
+		fpsStats.sum += fps
+		fpsStats.n += 1
+		fpsStatRow.Text = string.format(
+			"FPS min/rata/max: %d/%d/%d",
+			fpsStats.min, math.floor(fpsStats.sum / fpsStats.n + 0.5), fpsStats.max
+		)
 		frames = 0
 		lastTick = now
 	end
@@ -977,6 +1104,18 @@ task.spawn(function()
 			graphTimer = 0
 			pushSample(currentRate)
 		end
+
+		-- Auto bersihkan memori
+		if autoClean and now >= nextClean then
+			pcall(collectgarbage, "collect")
+			nextClean = now + 120
+		end
+
+		-- Info server, jam, stopwatch
+		playersRow.Text = "Pemain: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers
+		uptimeRow.Text = "Server aktif: " .. fmtTime(workspace.DistributedGameTime)
+		clockRow.Text = "Jam: " .. os.date("%H:%M:%S")
+		swRow.Text = "Stopwatch: " .. fmtTime(swElapsed + (swRunning and (now - swStart) or 0))
 
 		-- Pengingat istirahat
 		if remEnabled and now >= nextRemind then
