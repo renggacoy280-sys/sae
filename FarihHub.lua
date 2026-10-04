@@ -10,7 +10,7 @@ local UIS = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
-local VERSION = "V0.3"
+local VERSION = "V0.4"
 local DEVELOPER = "FARIH"
 local DISCORD = "Ellll0590"
 local WHATSAPP = "Saluran Comming"
@@ -722,12 +722,119 @@ addNote(profPage, "Stat dideteksi otomatis dari akunmu. Kalau tampil \"-\", game
 
 ---------------------------------------------------------------- Tab: Goal
 local goalPage = addTab("Goal")
-addSection(goalPage, "Target Money")
-addNote(goalPage, "Isi target, contoh: 500k, 1.5m, 2b. Estimasi dihitung dari Money/s kamu.", 30)
-local targetBox = addInput(goalPage, "Target (mis. 1.5m)")
-local goalProgRow = addRow(goalPage, "Progress: -")
-local goalLeftRow = addRow(goalPage, "Sisa: -")
-local goalEtaRow = addRow(goalPage, "Estimasi: -")
+local function addGoal(page, title, placeholder, withEta)
+	addSection(page, title)
+	local box = addInput(page, placeholder)
+	local g = {
+		target = nil,
+		prog = addRow(page, "Progress: -"),
+		left = addRow(page, "Sisa: -"),
+	}
+	if withEta then
+		g.eta = addRow(page, "Estimasi: -")
+	end
+	box.FocusLost:Connect(function()
+		g.target = parseAmount(box.Text)
+		if box.Text ~= "" and not g.target then
+			showToast("Format target tidak dikenal. Contoh: 500k atau 1.5m")
+		end
+	end)
+	return g
+end
+
+local function updateGoal(g, value, rate)
+	if not g.target or type(value) ~= "number" then
+		return
+	end
+	local pct = math.clamp(value / g.target * 100, 0, 100)
+	g.prog.Text = string.format("Progress: %.1f%%", pct)
+	local remaining = g.target - value
+	if remaining <= 0 then
+		g.left.Text = "Sisa: target tercapai!"
+		if g.eta then
+			g.eta.Text = "Estimasi: -"
+		end
+	else
+		g.left.Text = "Sisa: " .. fmt(remaining)
+		if g.eta then
+			g.eta.Text = "Estimasi: " .. ((rate or 0) > 0 and fmtTime(remaining / rate) or "-")
+		end
+	end
+end
+
+-- Hitung kecepatan naik stat per detik (jendela 5 detik)
+local function makeRate()
+	local hist = {}
+	return function(value)
+		if type(value) ~= "number" then
+			return nil
+		end
+		local now = os.clock()
+		table.insert(hist, { now, value })
+		while #hist > 1 and now - hist[1][1] > 5 do
+			table.remove(hist, 1)
+		end
+		local first, last = hist[1], hist[#hist]
+		local dt = last[1] - first[1]
+		if dt > 0.5 then
+			return math.max(0, (last[2] - first[2]) / dt)
+		end
+		return nil
+	end
+end
+local treadRate = makeRate()
+
+addNote(goalPage, "Isi target, contoh: 500k, 1.5m, 2b. Estimasi dihitung dari kecepatan naik stat kamu.", 30)
+local moneyGoal = addGoal(goalPage, "Target Money", "Target Money (mis. 1.5m)", true)
+local treadGoal = addGoal(goalPage, "Target Treadmill", "Target Treadmill (mis. 10k)", true)
+local speedGoal = addGoal(goalPage, "Target Speed", "Target Speed (mis. 500)", false)
+
+addSection(goalPage, "Grafik Money/s (1 menit terakhir)")
+local GRAPH_N, GRAPH_H = 30, 66
+local graphFrame = Instance.new("Frame")
+graphFrame.Size = UDim2.new(1, 0, 0, 70)
+graphFrame.BorderSizePixel = 0
+graphFrame.Parent = goalPage
+reg(graphFrame, "BackgroundColor3", "btn")
+corner(graphFrame, 5)
+local bars, samples = {}, {}
+for i = 1, GRAPH_N do
+	local bar = Instance.new("Frame")
+	bar.AnchorPoint = Vector2.new(0, 1)
+	bar.Position = UDim2.new((i - 1) / GRAPH_N, 2, 1, -2)
+	bar.Size = UDim2.new(1 / GRAPH_N, -2, 0, 1)
+	bar.BorderSizePixel = 0
+	bar.Visible = false
+	bar.Parent = graphFrame
+	reg(bar, "BackgroundColor3", "accent")
+	bars[i] = bar
+end
+local graphPeakRow = addRow(goalPage, "Puncak grafik: -")
+
+local function pushSample(v)
+	table.insert(samples, v)
+	if #samples > GRAPH_N then
+		table.remove(samples, 1)
+	end
+	local peak = 0
+	for _, s in ipairs(samples) do
+		if s > peak then
+			peak = s
+		end
+	end
+	local offset = GRAPH_N - #samples
+	for i, bar in ipairs(bars) do
+		local s = samples[i - offset]
+		if s then
+			bar.Visible = true
+			local h = peak > 0 and math.floor(s / peak * GRAPH_H) or 0
+			bar.Size = UDim2.new(1 / GRAPH_N, -2, 0, math.max(1, h))
+		else
+			bar.Visible = false
+		end
+	end
+	graphPeakRow.Text = "Puncak grafik: " .. fmt(peak) .. "/s"
+end
 
 addSection(goalPage, "Pengingat istirahat")
 local remEnabled, remMinutes, nextRemind = false, 30, 0
@@ -759,13 +866,6 @@ notesBox.FocusLost:Connect(function()
 	end)
 end)
 
-local goalTarget = nil
-targetBox.FocusLost:Connect(function()
-	goalTarget = parseAmount(targetBox.Text)
-	if not goalTarget then
-		showToast("Format target tidak dikenal. Contoh: 500k atau 1.5m")
-	end
-end)
 
 ---------------------------------------------------------------- Tab: Pemula
 local guidePage = addTab("Pemula")
@@ -823,7 +923,7 @@ table.insert(conns, RunService.RenderStepped:Connect(function()
 end))
 
 local history = {} -- { {t, money} } untuk Money/s (jendela 5 detik)
-local statsTimer = 0
+local statsTimer, graphTimer = 0, 0
 local sessionStart = os.clock()
 local startMoney, peakRate, currentRate = nil, 0, 0
 
@@ -855,28 +955,28 @@ task.spawn(function()
 			sessPeakRow.Text = "Money/s tertinggi: " .. fmt(peakRate)
 
 			-- Goal
-			if goalTarget then
-				local pct = math.clamp(money / goalTarget * 100, 0, 100)
-				goalProgRow.Text = string.format("Progress: %.1f%%", pct)
-				local left = goalTarget - money
-				if left <= 0 then
-					goalLeftRow.Text = "Sisa: target tercapai!"
-					goalEtaRow.Text = "Estimasi: -"
-				else
-					goalLeftRow.Text = "Sisa: " .. fmt(left)
-					goalEtaRow.Text = "Estimasi: " .. (currentRate > 0 and fmtTime(left / currentRate) or "-")
-				end
-			end
+			updateGoal(moneyGoal, money, currentRate)
 		end
 		sessTimeRow.Text = "Lama main: " .. fmtTime(now - sessionStart)
 
 		-- Speed
 		local char = player.Character
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		speedRow.Text = "Speed: " .. (hum and fmt(hum.WalkSpeed) or "-")
+		local walkSpeed = hum and hum.WalkSpeed
+		speedRow.Text = "Speed: " .. fmt(walkSpeed)
+		updateGoal(speedGoal, walkSpeed)
 
 		-- Treadmill
-		treadRow.Text = "Treadmill: " .. fmt(getTreadmill())
+		local tread = getTreadmill()
+		treadRow.Text = "Treadmill: " .. fmt(tread)
+		updateGoal(treadGoal, tread, treadRate(tread))
+
+		-- Grafik Money/s (tiap 2 detik)
+		graphTimer += 0.25
+		if graphTimer >= 2 then
+			graphTimer = 0
+			pushSample(currentRate)
+		end
 
 		-- Pengingat istirahat
 		if remEnabled and now >= nextRemind then
