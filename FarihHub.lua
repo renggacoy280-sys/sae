@@ -10,7 +10,7 @@ local UIS = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
-local VERSION = "V0.5"
+local VERSION = "V0.6"
 local DEVELOPER = "FARIH"
 local DISCORD = "Ellll0590"
 local WHATSAPP = "Saluran Comming"
@@ -900,6 +900,54 @@ addButton(toolsPage, "Rejoin server ini", function()
 	showToast("Mencoba masuk ulang...")
 	pcall(function()
 		game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+	end)
+end)
+
+local searching = false
+addButton(toolsPage, "Cari server sepi & pindah", function()
+	if searching then
+		return
+	end
+	searching = true
+	showToast("Mencari server paling sepi...")
+	task.spawn(function()
+		local ok, result = pcall(function()
+			local url = string.format(
+				"https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+				game.PlaceId
+			)
+			return game:GetService("HttpService"):JSONDecode(game:HttpGet(url))
+		end)
+		if not ok or type(result) ~= "table" or type(result.data) ~= "table" then
+			showToast("Gagal mengambil daftar server. Executor tidak mendukung HttpGet atau sedang kena batas, coba lagi nanti.")
+			searching = false
+			return
+		end
+
+		-- Pilih server dengan pemain paling sedikit (seri: ping terendah)
+		local best
+		for _, s in ipairs(result.data) do
+			if s.id ~= game.JobId and s.playing and s.maxPlayers and s.playing < s.maxPlayers then
+				if not best
+					or s.playing < best.playing
+					or (s.playing == best.playing and (s.ping or 9e9) < (best.ping or 9e9)) then
+					best = s
+				end
+			end
+		end
+		if not best then
+			showToast("Tidak ada server lain yang cocok.")
+			searching = false
+			return
+		end
+
+		showToast("Pindah ke server dengan " .. best.playing .. " pemain...")
+		pcall(function()
+			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, best.id, player)
+		end)
+		task.delay(10, function()
+			searching = false
+		end)
 	end)
 end)
 
