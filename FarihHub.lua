@@ -1,6 +1,7 @@
--- FarihHub V0.2
+-- FarihHub V0.3
 -- Developer: FARIH
--- Script tampilan & optimasi lokal. Tidak mengubah game / pemain lain.
+-- Script tampilan, optimasi & info lokal. Tidak mengotomatiskan gameplay
+-- dan tidak mengubah game / pemain lain.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,10 +10,11 @@ local UIS = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
-local VERSION = "V0.2"
+local VERSION = "V0.3"
 local DEVELOPER = "FARIH"
 local DISCORD = "Ellll0590"
 local WHATSAPP = "Saluran Comming"
+local NOTES_FILE = "FarihHub_notes.txt"
 
 ---------------------------------------------------------------- Helper umum
 local function guiParent()
@@ -39,6 +41,29 @@ local function fmt(n)
 		return string.format("%.0f", n)
 	end
 	return string.format("%.2f%s", n, suffixes[i])
+end
+
+local function fmtTime(sec)
+	sec = math.max(0, math.floor(sec))
+	return string.format("%02d:%02d:%02d", sec // 3600, (sec % 3600) // 60, sec % 60)
+end
+
+local multipliers = { k = 1e3, m = 1e6, b = 1e9, t = 1e12 }
+local function parseAmount(s)
+	s = (s:lower():gsub("[,%s]", ""))
+	local num, suf = s:match("^([%d%.]+)(%a*)$")
+	num = tonumber(num)
+	if not num then
+		return nil
+	end
+	if suf ~= "" then
+		local m = multipliers[suf]
+		if not m then
+			return nil
+		end
+		num *= m
+	end
+	return num
 end
 
 ---------------------------------------------------------------- Auto detect stat
@@ -93,7 +118,7 @@ local function makeDetector(keywords, fallbackFirstNumber)
 
 		local now = os.clock()
 		if now - lastScan < 3 then
-			return nil -- jangan scan terus-menerus
+			return nil
 		end
 		lastScan = now
 
@@ -146,21 +171,23 @@ local function newMode(applyFn, onEnable, onDisable)
 		if onEnable then
 			pcall(onEnable, m)
 		end
-		m.conn = workspace.DescendantAdded:Connect(function(d)
-			pcall(applyFn, m, d)
-		end)
-		task.spawn(function()
-			local all = workspace:GetDescendants()
-			for i, d in ipairs(all) do
-				if not m.on then
-					break
-				end
+		if applyFn then
+			m.conn = workspace.DescendantAdded:Connect(function(d)
 				pcall(applyFn, m, d)
-				if i % 300 == 0 then
-					task.wait()
+			end)
+			task.spawn(function()
+				local all = workspace:GetDescendants()
+				for i, d in ipairs(all) do
+					if not m.on then
+						break
+					end
+					pcall(applyFn, m, d)
+					if i % 300 == 0 then
+						task.wait()
+					end
 				end
-			end
-		end)
+			end)
+		end
 	end
 
 	function m.disable()
@@ -243,7 +270,7 @@ end, function(m)
 	end
 end)
 
--- 3) Sembunyikan pemain lain
+-- 3) Sembunyikan pemain lain (hanya di layarmu)
 local hidePlayersMode = newMode(function(m, d)
 	if d:IsA("BasePart") or d:IsA("Decal") then
 		local model = d:FindFirstAncestorOfClass("Model")
@@ -263,6 +290,38 @@ end)
 
 local allModes = { badMode, heavyMode, hidePlayersMode, muteMode }
 
+---------------------------------------------------------------- Tema
+local themes = {
+	Gelap = {
+		bg = Color3.fromRGB(22, 22, 30), bar = Color3.fromRGB(34, 34, 48),
+		btn = Color3.fromRGB(45, 45, 60), on = Color3.fromRGB(40, 130, 70),
+		accent = Color3.fromRGB(255, 200, 70),
+	},
+	Biru = {
+		bg = Color3.fromRGB(16, 24, 40), bar = Color3.fromRGB(24, 40, 70),
+		btn = Color3.fromRGB(34, 54, 90), on = Color3.fromRGB(40, 110, 200),
+		accent = Color3.fromRGB(120, 200, 255),
+	},
+	Hijau = {
+		bg = Color3.fromRGB(16, 30, 22), bar = Color3.fromRGB(24, 50, 36),
+		btn = Color3.fromRGB(34, 66, 48), on = Color3.fromRGB(50, 160, 90),
+		accent = Color3.fromRGB(150, 255, 170),
+	},
+	Ungu = {
+		bg = Color3.fromRGB(28, 18, 40), bar = Color3.fromRGB(48, 30, 70),
+		btn = Color3.fromRGB(64, 42, 92), on = Color3.fromRGB(140, 70, 200),
+		accent = Color3.fromRGB(230, 170, 255),
+	},
+}
+local themeOrder = { "Gelap", "Biru", "Hijau", "Ungu" }
+local theme = themes.Gelap
+local registry, rerenders, conns = {}, {}, {}
+
+local function reg(inst, prop, role)
+	inst[prop] = theme[role]
+	table.insert(registry, { inst, prop, role })
+end
+
 ---------------------------------------------------------------- GUI dasar
 local parent = guiParent()
 local old = parent:FindFirstChild("FarihHub")
@@ -274,12 +333,6 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "FarihHub"
 gui.ResetOnSpawn = false
 gui.Parent = parent
-
-local COL_BG = Color3.fromRGB(22, 22, 30)
-local COL_BAR = Color3.fromRGB(34, 34, 48)
-local COL_BTN = Color3.fromRGB(45, 45, 60)
-local COL_ON = Color3.fromRGB(40, 130, 70)
-local COL_ACCENT = Color3.fromRGB(255, 200, 70)
 
 local function corner(inst, r)
 	local c = Instance.new("UICorner")
@@ -311,26 +364,53 @@ local fpsLabel = newLabel("FPS: --", fpsFrame)
 fpsLabel.Size = UDim2.new(1, -10, 1, 0)
 fpsLabel.Position = UDim2.fromOffset(6, 0)
 
+-- Toast (pesan singkat di atas layar)
+local toast = newLabel("", gui)
+toast.Size = UDim2.fromOffset(280, 32)
+toast.AnchorPoint = Vector2.new(0.5, 0)
+toast.Position = UDim2.new(0.5, 0, 0, 10)
+toast.BackgroundTransparency = 0.2
+toast.BackgroundColor3 = Color3.new(0, 0, 0)
+toast.TextXAlignment = Enum.TextXAlignment.Center
+toast.TextWrapped = true
+toast.TextSize = 12
+toast.Visible = false
+corner(toast, 6)
+local toastId = 0
+local function showToast(text)
+	toastId += 1
+	local id = toastId
+	toast.Text = text
+	toast.Visible = true
+	task.delay(6, function()
+		if toastId == id then
+			toast.Visible = false
+		end
+	end)
+end
+
 -- Window
+local WIN_W, WIN_H = 300, 360
+
 local window = Instance.new("Frame")
-window.Size = UDim2.fromOffset(270, 340)
+window.Size = UDim2.fromOffset(WIN_W, WIN_H)
 window.Position = UDim2.new(0, 8, 0, 40)
-window.BackgroundColor3 = COL_BG
 window.BorderSizePixel = 0
 window.Parent = gui
+reg(window, "BackgroundColor3", "bg")
 corner(window, 8)
 
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 28)
-titleBar.BackgroundColor3 = COL_BAR
 titleBar.BorderSizePixel = 0
 titleBar.Parent = window
+reg(titleBar, "BackgroundColor3", "bar")
 corner(titleBar, 8)
 
 local titleLabel = newLabel("FarihHub " .. VERSION, titleBar)
 titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.fromOffset(10, 0)
-titleLabel.TextColor3 = COL_ACCENT
+reg(titleLabel, "TextColor3", "accent")
 
 local body = Instance.new("Frame")
 body.Size = UDim2.new(1, 0, 1, -28)
@@ -342,23 +422,26 @@ local function titleButton(text, xOffset, cb)
 	local b = Instance.new("TextButton")
 	b.Size = UDim2.fromOffset(26, 20)
 	b.Position = UDim2.new(1, xOffset, 0, 4)
-	b.BackgroundColor3 = COL_BTN
 	b.TextColor3 = Color3.new(1, 1, 1)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 13
 	b.Text = text
 	b.Parent = titleBar
+	reg(b, "BackgroundColor3", "btn")
 	corner(b, 4)
 	b.Activated:Connect(cb)
 end
 
 titleButton("-", -58, function()
 	body.Visible = not body.Visible
-	window.Size = body.Visible and UDim2.fromOffset(270, 340) or UDim2.fromOffset(270, 28)
+	window.Size = body.Visible and UDim2.fromOffset(WIN_W, WIN_H) or UDim2.fromOffset(WIN_W, 28)
 end)
 titleButton("X", -30, function()
 	for _, m in ipairs(allModes) do
 		m.disable()
+	end
+	for _, c in ipairs(conns) do
+		c:Disconnect()
 	end
 	gui:Destroy()
 end)
@@ -379,7 +462,7 @@ do
 			end)
 		end
 	end)
-	UIS.InputChanged:Connect(function(input)
+	table.insert(conns, UIS.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
 			or input.UserInputType == Enum.UserInputType.Touch) then
 			local d = input.Position - dragStart
@@ -388,8 +471,15 @@ do
 				startPos.Y.Scale, startPos.Y.Offset + d.Y
 			)
 		end
-	end)
+	end))
 end
+
+-- Tombol pintas: RightShift buka/tutup menu
+table.insert(conns, UIS.InputBegan:Connect(function(input, processed)
+	if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+		window.Visible = not window.Visible
+	end
+end))
 
 ---------------------------------------------------------------- Tab system
 local tabBar = Instance.new("Frame")
@@ -399,25 +489,31 @@ tabBar.BackgroundTransparency = 1
 tabBar.Parent = body
 local tabLayout = Instance.new("UIListLayout")
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.Padding = UDim.new(0, 4)
+tabLayout.Padding = UDim.new(0, 3)
 tabLayout.Parent = tabBar
 
 local pages, tabButtons = {}, {}
+local currentTab
 
 local function showTab(name)
+	currentTab = name
 	for n, p in pairs(pages) do
 		p.Visible = (n == name)
-		tabButtons[n].BackgroundColor3 = (n == name) and COL_ON or COL_BTN
+		tabButtons[n].BackgroundColor3 = (n == name) and theme.on or theme.btn
 	end
 end
+table.insert(rerenders, function()
+	if currentTab then
+		showTab(currentTab)
+	end
+end)
 
 local function addTab(name)
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1 / 3, -3, 1, 0)
-	btn.BackgroundColor3 = COL_BTN
+	btn.Size = UDim2.new(1 / 5, -3, 1, 0)
 	btn.TextColor3 = Color3.new(1, 1, 1)
 	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 12
+	btn.TextSize = 10
 	btn.Text = name
 	btn.Parent = tabBar
 	corner(btn, 5)
@@ -447,7 +543,7 @@ end
 local function addSection(page, text)
 	local l = newLabel(text, page)
 	l.Size = UDim2.new(1, 0, 0, 20)
-	l.TextColor3 = COL_ACCENT
+	reg(l, "TextColor3", "accent")
 	return l
 end
 
@@ -457,15 +553,26 @@ local function addRow(page, text)
 	return l
 end
 
+local function addNote(page, text, height)
+	local l = newLabel(text, page)
+	l.Font = Enum.Font.Gotham
+	l.TextSize = 11
+	l.TextWrapped = true
+	l.TextColor3 = Color3.fromRGB(200, 200, 210)
+	l.TextYAlignment = Enum.TextYAlignment.Top
+	l.Size = UDim2.new(1, 0, 0, height or 30)
+	return l
+end
+
 local function addButton(page, text, cb)
 	local b = Instance.new("TextButton")
 	b.Size = UDim2.new(1, 0, 0, 26)
-	b.BackgroundColor3 = COL_BTN
 	b.TextColor3 = Color3.new(1, 1, 1)
 	b.Font = Enum.Font.Gotham
 	b.TextSize = 12
 	b.Text = text
 	b.Parent = page
+	reg(b, "BackgroundColor3", "btn")
 	corner(b, 5)
 	b.Activated:Connect(cb)
 	return b
@@ -482,42 +589,105 @@ local function addToggle(page, text, initial, cb)
 	corner(b, 5)
 	local function render()
 		b.Text = text .. ": " .. (on and "ON" or "OFF")
-		b.BackgroundColor3 = on and COL_ON or COL_BTN
+		b.BackgroundColor3 = on and theme.on or theme.btn
 	end
 	render()
-	b.Activated:Connect(function()
-		on = not on
+	table.insert(rerenders, render)
+
+	local obj = {}
+	function obj.set(v)
+		if on == v then
+			return
+		end
+		on = v
 		render()
 		cb(on)
+	end
+	b.Activated:Connect(function()
+		obj.set(not on)
 	end)
+	return obj
+end
+
+local function addInput(page, placeholder, height, multiline)
+	local tb = Instance.new("TextBox")
+	tb.Size = UDim2.new(1, 0, 0, height or 26)
+	tb.TextColor3 = Color3.new(1, 1, 1)
+	tb.PlaceholderText = placeholder
+	tb.PlaceholderColor3 = Color3.fromRGB(150, 150, 160)
+	tb.Text = ""
+	tb.ClearTextOnFocus = false
+	tb.Font = Enum.Font.Gotham
+	tb.TextSize = 12
+	tb.MultiLine = multiline or false
+	tb.TextWrapped = multiline or false
+	tb.TextXAlignment = Enum.TextXAlignment.Left
+	tb.TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+	tb.Parent = page
+	reg(tb, "BackgroundColor3", "btn")
+	corner(tb, 5)
+	return tb
+end
+
+local function applyTheme(name)
+	theme = themes[name]
+	for _, r in ipairs(registry) do
+		if r[1].Parent then
+			r[1][r[2]] = theme[r[3]]
+		end
+	end
+	for _, f in ipairs(rerenders) do
+		f()
+	end
 end
 
 ---------------------------------------------------------------- Tab: Optimasi
 local optPage = addTab("Optimasi")
 addSection(optPage, "Statistik")
-local ping = addRow(optPage, "Ping: -")
+local pingRow = addRow(optPage, "Ping: -")
 local memRow = addRow(optPage, "Memori: -")
 
-addSection(optPage, "Naikkan FPS")
-local status = addRow(optPage, "")
-status.TextColor3 = Color3.fromRGB(180, 180, 190)
-status.TextSize = 11
-status.TextWrapped = true
-status.Size = UDim2.new(1, 0, 0, 28)
+local tBad, tHeavy, tHide, tMute, tFps
 
-addToggle(optPage, "Tampil FPS", true, function(on)
+addSection(optPage, "Preset 1 tap")
+addButton(optPage, "HP Kentang (paling ringan)", function()
+	tBad.set(true)
+	tHeavy.set(true)
+	tHide.set(true)
+	tMute.set(false)
+	showToast("Preset HP Kentang aktif.")
+end)
+addButton(optPage, "Seimbang (efek dimatikan saja)", function()
+	tBad.set(false)
+	tHeavy.set(true)
+	tHide.set(false)
+	tMute.set(false)
+	showToast("Preset Seimbang aktif.")
+end)
+addButton(optPage, "Reset semua ke normal", function()
+	tBad.set(false)
+	tHeavy.set(false)
+	tHide.set(false)
+	tMute.set(false)
+	showToast("Semua optimasi dimatikan.")
+end)
+
+addSection(optPage, "Atur manual")
+local status = addNote(optPage, "", 28)
+
+tFps = addToggle(optPage, "Tampil FPS", true, function(on)
 	fpsFrame.Visible = on
 end)
-addToggle(optPage, "Bangunan Buruk", false, function(on)
+tBad = addToggle(optPage, "Bangunan Buruk", false, function(on)
 	if on then badMode.enable() else badMode.disable() end
 end)
-addToggle(optPage, "Hapus Benda Berat", false, function(on)
+tHeavy = addToggle(optPage, "Hapus Benda Berat", false, function(on)
 	if on then heavyMode.enable() else heavyMode.disable() end
 end)
-addToggle(optPage, "Sembunyikan Pemain Lain", false, function(on)
+tHide = addToggle(optPage, "Sembunyikan Pemain Lain", false, function(on)
 	if on then hidePlayersMode.enable() else hidePlayersMode.disable() end
 end)
-addToggle(optPage, "Matikan Suara", false, function(on)
+tMute = addToggle(optPage, "Matikan Suara", false, function(on)
 	if on then muteMode.enable() else muteMode.disable() end
 end)
 addToggle(optPage, "Unlock FPS Cap", false, function(on)
@@ -543,35 +713,106 @@ local speedRow = addRow(profPage, "Speed: -")
 local treadRow = addRow(profPage, "Treadmill: -")
 local devRow = addRow(profPage, "Developer: " .. DEVELOPER)
 devRow.TextColor3 = Color3.fromRGB(120, 220, 255)
-local detectNote = addRow(profPage, "Stat dideteksi otomatis dari akunmu.")
-detectNote.TextSize = 11
-detectNote.TextColor3 = Color3.fromRGB(180, 180, 190)
-detectNote.TextWrapped = true
-detectNote.Size = UDim2.new(1, 0, 0, 28)
 
----------------------------------------------------------------- Tab: Community
-local comPage = addTab("Community")
-addSection(comPage, "Gabung komunitas")
-addRow(comPage, "Discord: " .. DISCORD)
-addButton(comPage, "Salin Discord", function()
+addSection(profPage, "Statistik sesi")
+local sessTimeRow = addRow(profPage, "Lama main: 00:00:00")
+local sessGainRow = addRow(profPage, "Money didapat: -")
+local sessPeakRow = addRow(profPage, "Money/s tertinggi: -")
+addNote(profPage, "Stat dideteksi otomatis dari akunmu. Kalau tampil \"-\", game belum menyimpan stat itu di leaderstats.", 42)
+
+---------------------------------------------------------------- Tab: Goal
+local goalPage = addTab("Goal")
+addSection(goalPage, "Target Money")
+addNote(goalPage, "Isi target, contoh: 500k, 1.5m, 2b. Estimasi dihitung dari Money/s kamu.", 30)
+local targetBox = addInput(goalPage, "Target (mis. 1.5m)")
+local goalProgRow = addRow(goalPage, "Progress: -")
+local goalLeftRow = addRow(goalPage, "Sisa: -")
+local goalEtaRow = addRow(goalPage, "Estimasi: -")
+
+addSection(goalPage, "Pengingat istirahat")
+local remEnabled, remMinutes, nextRemind = false, 30, 0
+local remBtn
+addToggle(goalPage, "Ingatkan", false, function(on)
+	remEnabled = on
+	nextRemind = os.clock() + remMinutes * 60
+end)
+remBtn = addButton(goalPage, "Interval: 30 menit (tap untuk ganti)", function()
+	local options = { 15, 30, 45, 60 }
+	local idx = table.find(options, remMinutes) or 1
+	remMinutes = options[idx % #options + 1]
+	remBtn.Text = "Interval: " .. remMinutes .. " menit (tap untuk ganti)"
+	nextRemind = os.clock() + remMinutes * 60
+end)
+
+addSection(goalPage, "Catatan")
+local notesBox = addInput(goalPage, "Tulis catatan di sini...", 90, true)
+pcall(function()
+	if isfile and readfile and isfile(NOTES_FILE) then
+		notesBox.Text = readfile(NOTES_FILE)
+	end
+end)
+notesBox.FocusLost:Connect(function()
+	pcall(function()
+		if writefile then
+			writefile(NOTES_FILE, notesBox.Text)
+		end
+	end)
+end)
+
+local goalTarget = nil
+targetBox.FocusLost:Connect(function()
+	goalTarget = parseAmount(targetBox.Text)
+	if not goalTarget then
+		showToast("Format target tidak dikenal. Contoh: 500k atau 1.5m")
+	end
+end)
+
+---------------------------------------------------------------- Tab: Pemula
+local guidePage = addTab("Pemula")
+addSection(guidePage, "Panduan singkat")
+addNote(guidePage, "1. Game lag? Buka tab Optimasi lalu tap preset \"HP Kentang\". Kalau masih berat, nyalakan Unlock FPS Cap dan Bersihkan Memori.", 56)
+addNote(guidePage, "2. Pantau progresmu di tab Profile (Money, Money/s, Speed, Treadmill).", 32)
+addNote(guidePage, "3. Pasang target di tab Goal supaya tahu kira-kira kapan tercapai.", 32)
+addNote(guidePage, "4. Ping di atas 150 ms biasanya bikin game terasa delay. Coba pindah server atau pakai sinyal yang lebih stabil.", 44)
+addNote(guidePage, "5. Nyalakan pengingat istirahat di tab Goal supaya main tetap sehat.", 32)
+addSection(guidePage, "Keamanan akun")
+addNote(guidePage, "Jangan pernah bagikan password, kode login, atau cookie akun ke siapa pun. Hati-hati dengan script atau link dari sumber yang tidak dikenal.", 56)
+addSection(guidePage, "Tips menu")
+addNote(guidePage, "Geser jendela lewat judul. Tombol \"-\" untuk kecilkan, tombol RightShift untuk buka/tutup (di PC).", 44)
+
+---------------------------------------------------------------- Tab: Info
+local infoPage = addTab("Info")
+addSection(infoPage, "Komunitas")
+addRow(infoPage, "Discord: " .. DISCORD)
+addButton(infoPage, "Salin Discord", function()
 	if setclipboard then
 		pcall(setclipboard, DISCORD)
+		showToast("Discord disalin.")
 	end
 end)
-addRow(comPage, "WhatsApp: " .. WHATSAPP)
-addButton(comPage, "Salin WhatsApp", function()
+addRow(infoPage, "WhatsApp: " .. WHATSAPP)
+addButton(infoPage, "Salin WhatsApp", function()
 	if setclipboard then
 		pcall(setclipboard, WHATSAPP)
+		showToast("WhatsApp disalin.")
 	end
 end)
-local credit = addRow(comPage, "FarihHub " .. VERSION .. " by " .. DEVELOPER)
-credit.TextColor3 = COL_ACCENT
+
+addSection(infoPage, "Tema warna")
+for _, name in ipairs(themeOrder) do
+	addButton(infoPage, "Tema " .. name, function()
+		applyTheme(name)
+	end)
+end
+
+local credit = addRow(infoPage, "FarihHub " .. VERSION .. " by " .. DEVELOPER)
+reg(credit, "TextColor3", "accent")
 
 showTab("Optimasi")
 
 ---------------------------------------------------------------- Loop update
 local frames, lastTick = 0, os.clock()
-RunService.RenderStepped:Connect(function()
+table.insert(conns, RunService.RenderStepped:Connect(function()
 	frames += 1
 	local now = os.clock()
 	if now - lastTick >= 0.5 then
@@ -579,18 +820,24 @@ RunService.RenderStepped:Connect(function()
 		frames = 0
 		lastTick = now
 	end
-end)
+end))
 
 local history = {} -- { {t, money} } untuk Money/s (jendela 5 detik)
 local statsTimer = 0
+local sessionStart = os.clock()
+local startMoney, peakRate, currentRate = nil, 0, 0
 
 task.spawn(function()
 	while gui.Parent do
+		local now = os.clock()
+
 		-- Money real time
 		local money = getMoney()
 		moneyRow.Text = "Money: " .. fmt(money)
 		if type(money) == "number" then
-			local now = os.clock()
+			if not startMoney then
+				startMoney = money
+			end
 			table.insert(history, { now, money })
 			while #history > 1 and now - history[1][1] > 5 do
 				table.remove(history, 1)
@@ -598,9 +845,30 @@ task.spawn(function()
 			local first, last = history[1], history[#history]
 			local dt = last[1] - first[1]
 			if dt > 0.5 then
-				mpsRow.Text = "Money/s: " .. fmt(math.max(0, (last[2] - first[2]) / dt))
+				currentRate = math.max(0, (last[2] - first[2]) / dt)
+				mpsRow.Text = "Money/s: " .. fmt(currentRate)
+				if currentRate > peakRate then
+					peakRate = currentRate
+				end
+			end
+			sessGainRow.Text = "Money didapat: " .. fmt(money - startMoney)
+			sessPeakRow.Text = "Money/s tertinggi: " .. fmt(peakRate)
+
+			-- Goal
+			if goalTarget then
+				local pct = math.clamp(money / goalTarget * 100, 0, 100)
+				goalProgRow.Text = string.format("Progress: %.1f%%", pct)
+				local left = goalTarget - money
+				if left <= 0 then
+					goalLeftRow.Text = "Sisa: target tercapai!"
+					goalEtaRow.Text = "Estimasi: -"
+				else
+					goalLeftRow.Text = "Sisa: " .. fmt(left)
+					goalEtaRow.Text = "Estimasi: " .. (currentRate > 0 and fmtTime(left / currentRate) or "-")
+				end
 			end
 		end
+		sessTimeRow.Text = "Lama main: " .. fmtTime(now - sessionStart)
 
 		-- Speed
 		local char = player.Character
@@ -610,6 +878,12 @@ task.spawn(function()
 		-- Treadmill
 		treadRow.Text = "Treadmill: " .. fmt(getTreadmill())
 
+		-- Pengingat istirahat
+		if remEnabled and now >= nextRemind then
+			showToast("Sudah " .. remMinutes .. " menit main. Waktunya istirahat sebentar!")
+			nextRemind = now + remMinutes * 60
+		end
+
 		-- Ping + memori (tiap ~0.5 detik)
 		statsTimer += 0.25
 		if statsTimer >= 0.5 then
@@ -617,7 +891,7 @@ task.spawn(function()
 			local okP, p = pcall(function()
 				return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
 			end)
-			ping.Text = "Ping: " .. (okP and (math.floor(p) .. " ms") or "-")
+			pingRow.Text = "Ping: " .. (okP and (math.floor(p) .. " ms") or "-")
 			local okM, mem = pcall(function()
 				return Stats:GetTotalMemoryUsageMb()
 			end)
