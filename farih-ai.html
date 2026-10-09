@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FARIH AI</title>
+<style>
+:root{--bg:#070d1a;--panel:#0d1729;--panel2:#101d33;--line:#233454;--text:#eef3ff;--muted:#9aacca;--purple:#6c4cff;--blue:#24b8ff;--danger:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 55% 0%,#14234b 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh}
+button,input,textarea{font:inherit}button{cursor:pointer}
+.app{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr) 310px;max-width:1700px;margin:auto}
+.sidebar{border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;gap:22px;background:#080f1d}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:24px;letter-spacing:-.8px;padding:0 7px}.logo{display:grid;place-items:center;width:43px;height:43px;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--blue));font-size:26px;font-weight:900;color:white;box-shadow:0 0 28px #654bff44}
+.brand span span{color:#8b7aff}.nav{display:grid;gap:8px}.nav button,.secondary{background:transparent;color:#cbd8f3;border:1px solid transparent;border-radius:12px;padding:12px;text-align:left}.nav button.active,.nav button:hover{background:#302a72aa;border-color:#4a4696;color:white}.hint{border:1px solid #353e8b;border-radius:14px;padding:15px;color:#b9c9e8;background:linear-gradient(145deg,#111a3a,#0b1426)}.hint b{display:block;color:white;margin-bottom:5px}.foot{margin-top:auto;color:#7189b5;font-size:12px;padding:6px}
+.main{display:flex;flex-direction:column;min-height:100vh;min-width:0}.topbar{height:65px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px}.topbar small{color:var(--muted)}.topactions{display:flex;gap:8px}.iconbtn{border:1px solid var(--line);background:var(--panel);color:#dbe6ff;border-radius:10px;padding:8px 11px}
+.chatarea{width:min(850px,100%);margin:0 auto;padding:28px 22px 18px;display:flex;flex-direction:column;flex:1;min-height:0}.welcome{text-align:center;margin:auto auto 25px;max-width:620px}.biglogo{width:74px;height:74px;margin:0 auto 22px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(135deg,var(--purple),var(--blue));font-size:48px;font-weight:900;box-shadow:0 0 55px #654bff42}.welcome h1{font-size:clamp(25px,4vw,34px);line-height:1.2;margin:0 0 13px}.gradient{background:linear-gradient(90deg,#9a77ff,#42c8ff);background-clip:text;color:transparent}.welcome p{color:#b9c8e5;margin:0 auto;max-width:550px}.quick{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:23px}.quick button{background:#0d1729;border:1px solid var(--line);border-radius:999px;padding:9px 14px;color:#d9e5ff}.quick button:hover{border-color:#7667ff}
+.messages{display:flex;flex-direction:column;gap:18px;padding:12px 0 22px}.message{display:flex;gap:11px;align-items:flex-start;max-width:100%}.message.user{justify-content:flex-end}.bubble{max-width:min(85%,700px);padding:13px 16px;border:1px solid var(--line);border-radius:16px;background:#0e1a2e;white-space:pre-wrap;overflow-wrap:anywhere}.user .bubble{background:#292563;border-color:#5147a8}.avatar{flex:0 0 32px;width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--blue));font-weight:800}.composer{display:flex;gap:10px;align-items:flex-end;border:1px solid var(--line);background:#0d1729;border-radius:16px;padding:10px;box-shadow:0 12px 35px #0002}.composer textarea{flex:1;min-width:0;resize:vertical;min-height:45px;max-height:180px;border:0;outline:0;background:transparent;color:var(--text);padding:11px 7px}.send{border:0;border-radius:12px;background:linear-gradient(135deg,var(--purple),#5148ff);color:white;padding:12px 17px;font-weight:700}.send:disabled{opacity:.5;cursor:wait}.status{font-size:12px;color:var(--muted);text-align:center;min-height:22px;padding-top:8px}
+.right{padding:22px 16px;border-left:1px solid var(--line);background:#080f1d;display:flex;flex-direction:column;gap:16px}.card{border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,#0d1729,#0a1323);padding:17px}.card h2{font-size:18px;margin:0 0 7px}.card p{color:#b3c4e3;margin:0 0 13px;font-size:13px}.field{display:block;width:100%;border:1px solid #304363;background:#070f1d;color:white;border-radius:10px;padding:12px;outline:none}.field:focus{border-color:#7b69ff}.btn{width:100%;border:0;border-radius:10px;padding:11px 12px;font-weight:700;margin-top:9px;background:linear-gradient(100deg,#5a4dff,#5146e8);color:white}.btn.secondary{border:1px solid var(--line);background:transparent;color:#cbd8f3}.notice{font-size:12px;color:#a9bddf;background:#0a1425;border:1px solid #223454;border-radius:11px;padding:11px;margin-top:13px}.features{display:grid;gap:11px;color:#c7d6f3;font-size:13px}.features div:before{content:"✓";display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#293b9d;color:white;margin-right:8px}.tiny{font-size:11px!important;color:#8096bd!important;margin-top:13px!important}
+@media(max-width:1100px){.app{grid-template-columns:205px minmax(0,1fr)}.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.right .card:first-child{grid-row:span 2}}
+@media(max-width:700px){.app{display:flex;flex-direction:column}.sidebar{border-right:0;border-bottom:1px solid var(--line);padding:12px;gap:12px}.brand{font-size:20px}.logo{width:36px;height:36px}.nav{display:flex;gap:6px}.nav button{flex:1;text-align:center;padding:9px 5px;font-size:13px}.hint,.foot{display:none}.main{min-height:70vh}.topbar{height:52px;padding:0 13px}.chatarea{padding:20px 12px 14px;min-height:460px}.welcome{margin:auto auto 20px}.right{display:flex;padding:12px;border-top:1px solid var(--line)}.bubble{max-width:90%}.composer{padding:7px}.send{padding:11px 13px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="logo">F</div><span>FARIH <span>AI</span></span></div>
+  <nav class="nav"><button class="active" id="chatTab">▣ &nbsp; Chat</button><button id="historyTab">◷ &nbsp; Riwayat</button><button id="settingsTab">⚙ &nbsp; Pengaturan</button></nav>
+  <div class="hint"><b>✦ Mulai menggunakan AI</b>Masukkan API Key OpenAI di panel kanan, lalu ajukan pertanyaanmu.</div>
+  <div class="foot">FARIH AI v1.0<br><br>Powered by OpenAI<br><br>Chat. Learn. Create.</div>
+</aside>
+<main class="main">
+  <header class="topbar"><small>Asisten AI pribadi</small><div class="topactions"><button class="iconbtn" id="clearBtn" title="Chat baru">＋ Chat baru</button></div></header>
+  <section class="chatarea">
+    <div class="welcome" id="welcome">
+      <div class="biglogo">F</div>
+      <h1>Selamat datang di <span class="gradient">FARIH AI</span></h1>
+      <p>Asisten AI siap membantu kamu kapan saja. Masukkan API Key OpenAI, lalu tanyakan apa saja.</p>
+      <div class="quick">
+        <button data-prompt="Jelaskan sesuatu dengan sederhana: ">✧ Jelaskan sesuatu</button>
+        <button data-prompt="Bantu aku membuat kode untuk: ">⌘ Buat kode</button>
+        <button data-prompt="Ringkas teks berikut: ">▤ Ringkas teks</button>
+        <button data-prompt="Berikan ide kreatif untuk: ">✦ Beri ide</button>
+      </div>
+    </div>
+    <div class="messages" id="messages" aria-live="polite"></div>
+    <form class="composer" id="chatForm"><textarea id="prompt" rows="1" placeholder="Tulis pesan kamu di sini..." aria-label="Pesan"></textarea><button class="send" id="sendBtn" type="submit">➤</button></form>
+    <div class="status" id="status">Masukkan API Key di panel kanan untuk mulai chat.</div>
+  </section>
+</main>
+<aside class="right" id="rightPanel">
+  <section class="card" id="apiCard">
+    <h2>🔑 API Key OpenAI</h2><p>Masukkan API Key milikmu untuk menghubungkan FARIH AI.</p>
+    <input class="field" id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+    <button class="btn" id="saveKey">Simpan API Key</button>
+    <button class="btn secondary" id="deleteKey">Hapus API Key</button>
+    <div class="notice">🔒 API Key disimpan hanya di memori tab ini dan tidak dimasukkan ke file website. Saat chat, browser mengirimkannya langsung ke API OpenAI.</div>
+    <p class="tiny">Jangan bagikan API Key atau gunakan cara ini pada website publik. Untuk website publik, gunakan backend yang aman.</p>
+  </section>
+  <section class="card"><h2>⚡ Fitur FARIH AI</h2><div class="features"><div>Chat dengan AI OpenAI</div><div>Riwayat selama sesi ini</div><div>Tampilan responsif HP & PC</div><div>Chat baru dan prompt cepat</div><div>Desain modern dan ringan</div></div></section>
+  <section class="card"><p style="margin:0">👑 Dibuat dengan ❤️ oleh <b style="color:#9d8bff">FARIH</b></p></section>
+</aside>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let apiKey = "";
+  let history = [];
+  let busy = false;
+  const messagesEl = $("messages");
+  const statusEl = $("status");
+  const promptEl = $("prompt");
+  const welcome = $("welcome");
+
+  function setStatus(text){ statusEl.textContent = text; }
+  function renderMessage(role, content) {
+    welcome.style.display = "none";
+    const row = document.createElement("div");
+    row.className = "message " + (role === "user" ? "user" : "assistant");
+    if (role !== "user") {
+      const avatar = document.createElement("div");
+      avatar.className = "avatar"; avatar.textContent = "F";
+      row.appendChild(avatar);
+    }
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = content;
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    row.scrollIntoView({behavior:"smooth", block:"nearest"});
+    return bubble;
+  }
+  $("saveKey").addEventListener("click", () => {
+    const value = $("apiKey").value.trim();
+    if (!value) { setStatus("Masukkan API Key terlebih dahulu."); return; }
+    if (!value.startsWith("sk-")) { setStatus("Format API Key terlihat tidak biasa. Periksa kembali key kamu."); return; }
+    apiKey = value;
+    $("apiKey").value = "";
+    setStatus("API Key aktif untuk tab ini. Kamu bisa mulai chat.");
+  });
+  $("deleteKey").addEventListener("click", () => {
+    apiKey = ""; $("apiKey").value = "";
+    setStatus("API Key sudah dihapus dari sesi ini.");
+  });
+  $("clearBtn").addEventListener("click", () => {
+    history = []; messagesEl.replaceChildren(); welcome.style.display = "";
+    setStatus(apiKey ? "Chat baru siap." : "Masukkan API Key di panel kanan untuk mulai chat.");
+    promptEl.focus();
+  });
+  $("chatTab").addEventListener("click", () => { setStatus(apiKey ? "Siap membantu." : "Masukkan API Key di panel kanan untuk mulai chat."); });
+  $("historyTab").addEventListener("click", () => { setStatus(history.length ? `Riwayat sesi ini berisi ${history.length} pesan.` : "Belum ada riwayat chat pada sesi ini."); });
+  $("settingsTab").addEventListener("click", () => { $("apiCard").scrollIntoView({behavior:"smooth",block:"center"}); $("apiKey").focus(); });
+  document.querySelectorAll("[data-prompt]").forEach(btn => btn.addEventListener("click", () => { promptEl.value = btn.dataset.prompt; promptEl.focus(); }));
+  promptEl.addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); $("chatForm").requestSubmit(); }});
+
+  $("chatForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const text = promptEl.value.trim();
+    if (!text || busy) return;
+    if (!apiKey) { setStatus("Masukkan dan simpan API Key OpenAI terlebih dahulu."); $("apiKey").focus(); return; }
+    busy = true; $("sendBtn").disabled = true;
+    promptEl.value = "";
+    renderMessage("user", text);
+    history.push({role:"user",content:text});
+    const pending = renderMessage("assistant", "Sedang berpikir…");
+    setStatus("Menghubungkan ke OpenAI…");
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer " + apiKey},
+        body:JSON.stringify({
+          model:"gpt-4.1-mini",
+          instructions:"Kamu adalah FARIH AI, asisten yang ramah, membantu, dan menjawab dalam bahasa Indonesia kecuali pengguna meminta bahasa lain.",
+          input:history,
+          max_output_tokens:1000
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error?.message || `Permintaan gagal (HTTP ${response.status}).`);
+      let reply = data.output_text || "";
+      if (!reply && Array.isArray(data.output)) {
+        reply = data.output.flatMap(item => item.content || []).filter(c => c.type === "output_text").map(c => c.text).join("\n");
+      }
+      if (!reply) reply = "AI tidak mengembalikan teks. Coba kirim pertanyaan lagi.";
+      pending.textContent = reply;
+      history.push({role:"assistant",content:reply});
+      setStatus("Selesai.");
+    } catch(err) {
+      pending.textContent = "Gagal menghubungi AI: " + err.message;
+      history.pop();
+      setStatus("Periksa API Key, akses internet, saldo/batas API, dan model yang tersedia.");
+    } finally {
+      busy = false; $("sendBtn").disabled = false; promptEl.focus();
+    }
+  });
+})();
+</script>
+</body>
+</html>
